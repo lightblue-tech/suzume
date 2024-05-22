@@ -131,17 +131,17 @@ if __name__ == "__main__":
 
     eval_model_name = "gpt-4-0125-preview"
 
-    dataset = load_dataset("lightblue/multilingual_prompts_100_sample_evaled", split="train")
+    dataset = load_dataset("lightblue/mitsu", split="train")
     dataset = dataset.filter(lambda x: not any([x["content"] is None for x in x["llm_responses"].values()]))
 
-    dataset.push_to_hub("lightblue/multilingual_prompts_100_sample_evaled")
+    dataset.push_to_hub("lightblue/mitsu")
     dataset = dataset.map(lambda x: eval_row(x, eval_model_name), num_proc=4)
-    dataset.push_to_hub("lightblue/multilingual_prompts_100_sample_evaled")
+    dataset.push_to_hub("lightblue/mitsu")
     dataset = dataset.map(lambda x: eval_row(x, eval_model_name), num_proc=4)
-    dataset.push_to_hub("lightblue/multilingual_prompts_100_sample_evaled")
+    dataset.push_to_hub("lightblue/mitsu")
     dataset = dataset.map(lambda x: eval_row(x, eval_model_name), num_proc=4)
-    dataset.push_to_hub("lightblue/multilingual_prompts_100_sample_evaled")
+    dataset.push_to_hub("lightblue/mitsu")
     dataset = dataset.map(lambda x: eval_row(x, eval_model_name), num_proc=4)
-    dataset.push_to_hub("lightblue/multilingual_prompts_100_sample_evaled")
+    dataset.push_to_hub("lightblue/mitsu")
     dataset = dataset.map(lambda x: eval_row(x, eval_model_name), num_proc=4)
-    dataset.push_to_hub("lightblue/multilingual_prompts_100_sample_evaled")
+    dataset.push_to_hub("lightblue/mitsu")
