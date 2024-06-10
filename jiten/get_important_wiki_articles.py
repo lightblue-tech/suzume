@@ -112,7 +112,7 @@ for l in language_codes:
 model = BGEM3FlagModel('BAAI/bge-m3', use_fp16=True)
 
 for l in language_codes:
-    get_top_article_names(l, model, final_selected_num=100)
+    get_top_article_names(l, model, final_selected_num=500)
 
 for l in popular_language_codes:
     get_top_article_names(l, model, final_selected_num=5_000)
