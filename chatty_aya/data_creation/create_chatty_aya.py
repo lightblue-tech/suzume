@@ -62,7 +62,7 @@ chunk_size = 1_000
 for i in trange(0, len(aya_dataset), chunk_size):
     batch_dataset = aya_dataset.select(range(i, min(i+chunk_size, len(aya_dataset))))
 
-    input_data = list(zip(aya_dataset["inputs"], aya_dataset["targets"], aya_dataset["language"]))
+    input_data = list(zip(batch_dataset["inputs"], batch_dataset["targets"], batch_dataset["language"]))
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         response_results = list(tqdm(executor.map(chatty_handler, input_data), total=len(input_data)))
