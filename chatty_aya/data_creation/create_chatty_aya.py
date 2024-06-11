@@ -56,7 +56,7 @@ def chatty_handler(input_data_items):
             "finish_reason": None,
         }
     
-aya_dataset = load_dataset("CohereForAI/aya_dataset", split=True)
+aya_dataset = load_dataset("CohereForAI/aya_dataset", split="train")
 chunk_size = 1_000
 
 for i in trange(0, len(aya_dataset), chunk_size):
