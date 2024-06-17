@@ -72,7 +72,7 @@ def chatty_handler(input_data_items):
 aya_dataset = load_dataset("CohereForAI/aya_dataset", split="train")
 chunk_size = 1_000
 
-for i in trange(38_000, len(aya_dataset), chunk_size):
+for i in trange(0, len(aya_dataset), chunk_size):
     batch_dataset = aya_dataset.select(range(i, min(i+chunk_size, len(aya_dataset))))
 
     input_data = list(zip(batch_dataset["inputs"], batch_dataset["targets"], batch_dataset["language"]))
