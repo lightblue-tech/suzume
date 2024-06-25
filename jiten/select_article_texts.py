@@ -11,7 +11,7 @@ def gen_article_texts(num_per_cluster, lang_codes=None):
 
     for p in tqdm(sorted(paths)):
 
-        lang_code = p.split("_50.parquet")[-2].split("_")[-1]
+        lang_code = p.split("_500.parquet")[-2].split("_")[-1]
         
         if lang_codes is not None and lang_code not in lang_codes:
             continue
@@ -32,8 +32,9 @@ def gen_article_texts(num_per_cluster, lang_codes=None):
         sampled_dataset = sampled_dataset.add_column("language_code", [lang_code] * len(sampled_dataset))
 
         dataset_list.append(sampled_dataset)
-
-    concatenate_datasets(dataset_list).to_parquet(f"cluster_500_article_texts_{num_per_cluster}.parquet")
+            
+    pop_str = "" if lang_codes is None else "_pop"
+    concatenate_datasets(dataset_list).to_parquet(f"cluster_500_article_texts_{num_per_cluster}{pop_str}.parquet")
 
 if __name__ == '__main__':
     gen_article_texts(num_per_cluster = 1)
@@ -41,3 +42,5 @@ if __name__ == '__main__':
     popular_language_codes = set(['en', 'de', 'fr', 'es', 'ru', 'pt', 'it', 'pl', 'nl', 'uk', 'fi', 'hu', 'et', 'tr', 'uz', 'az', 'kk', 'ar', 'he', 'am', 'my', 'sw', 'zu', 'xh', 'yo', 'ig', 'ta', 'ml', 'te', 'kn', 'id', 'vi', 'th', 'ms', 'jv', 'tl', 'km', 'su', 'hi', 'mr', 'gu', 'pa', 'bn', 'ja', 'ko', 'mi', 'sm', 'ur', 'zh', 'zh_min_nan', 'pcm', 'ha', 'om', 'ro', 'el', 'sv', 'cs', 'fa'])
 
     gen_article_texts(num_per_cluster = 10, lang_codes=popular_language_codes)
+    
+    gen_article_texts(num_per_cluster = 50)
