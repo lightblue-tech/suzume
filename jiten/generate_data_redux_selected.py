@@ -1,5 +1,4 @@
 import random
-import pandas as pd
 from transformers import GPT2TokenizerFast
 from tqdm.auto import tqdm
 from openai import AzureOpenAI, BadRequestError
@@ -8,15 +7,18 @@ from tqdm.auto import tqdm
 import os
 import json
 import argparse
+from datasets import load_dataset
+import pandas as pd
 
-make_sys_message = lambda l, t: f"""Given a Wikipedia article in {l}, write a prompt in {l} that a user may ask a language model about that topic. 
+def make_sys_message(l, t, c): 
+    return f"""Given a Wikipedia article in {l}, write a prompt in {l} that a user may ask a language model about that topic. 
 Then write a truthful response in {l} from a helpful AI assistant. 
 The prompt and response can be tangentially related or directly related to the Wikipedia article. 
 
 # Prompt requirements
 Make the prompt unique to the general theme of the article.
 Make the prompt a practical prompt that a user may actually ask an LLM.
-The requested task can be as diverse as generating, analyzing, explaining, describing, calculating, creating, combining, or other tasks that may be asked by a user.
+The requested task could ask the assistant to {c} something or another task that could be asked by a real user.
 Write the prompt so it does not refer to any knowledge that is assumed from the article. 
 Write the prompt so that it could be given without ever having read the passage.
 The prompt should be written as a {t} in fluent {l}.
@@ -52,7 +54,7 @@ client = AzureOpenAI(
     azure_endpoint = os.environ["AZURE_OPENAI_ENDPOINT"]
 )
 
-def get_openai_response(title_text, input_text, input_language, prompt_type, max_tokens = 2048):
+def get_openai_response(title_text, input_text, input_language, prompt_type, prompt_category, max_tokens = 2048):
 
     response = client.chat.completions.create(
         model="gpt4o-2024-05-13",
@@ -62,7 +64,7 @@ def get_openai_response(title_text, input_text, input_language, prompt_type, max
           "content": [
             {
               "type": "text",
-              "text": make_sys_message(input_language, prompt_type)
+              "text": make_sys_message(input_language, prompt_type, prompt_category)
             }
           ]
         },
@@ -87,10 +89,10 @@ def get_openai_response(title_text, input_text, input_language, prompt_type, max
     return {"finish_reason": choice.finish_reason, "content": choice.message.content}
 
 def handle_openai_call(input_data_item):
-    title_text, input_text, input_language, prompt_type = input_data_item
+    title_text, input_text, input_language, prompt_type, prompt_category = input_data_item
     # return get_openai_response(title_text, input_text, input_language, prompt_type)
     try:
-        return get_openai_response(title_text, input_text, input_language, prompt_type)
+        return get_openai_response(title_text, input_text, input_language, prompt_type, prompt_category)
     except BadRequestError as bre:
         print(json.loads(bre.response.content))
         return {"bad_request": str(json.loads(bre.response.content)["error"]["innererror"])}
@@ -102,33 +104,41 @@ supported_language_map = {'ab': 'Abkhaz', 'ace': 'Acehnese', 'ady': 'Adyghe', 'a
 
 def run_generation(cluster_num):
 
-    df = pd.read_parquet(f"./cluster_500_article_texts_xyz_{cluster_num}_pop.parquet")
-    df.sample(frac=1.0, random_state=0).to_parquet(f"./cluster_500_article_texts_xyz_{cluster_num}_shuffled.parquet")
-    df = pd.read_parquet(f"./cluster_500_article_texts_xyz_{cluster_num}_shuffled.parquet")
-
-    df = df[df["language_code"] != "be-x-old"]
-    df["language_name"] = df["language_code"].map(supported_language_map)
-    df["prompt_type"] = df.text.apply(lambda x: "command" if random.random() >= 0.5 else "question")
-
+    # ds = load_dataset("parquet", data_files={"train": f"./cluster_500_article_texts_{cluster_num}.parquet"}, split="train", num_proc=16)
+    # ds = ds.shuffle(seed=42).to_parquet(f"./cluster_500_article_texts_{cluster_num}_shuffled.parquet")
+    ds = load_dataset("parquet", data_files={"train": f"./cluster_500_article_texts_{cluster_num}_shuffled.parquet"}, split="train", num_proc=16)
+    
+    ds = ds.filter(
+        lambda x: x["language_code"] in ["ar", "zh", "ja", "ko", "ru", "es", "pt", "hi", "id"], num_proc=16
+    )
+    ds = ds.map(lambda x: {"language_name": supported_language_map[x["language_code"]]}, num_proc=16)
+    ds = ds.map(lambda x: {"prompt_type": "command" if random.random() >= 0.5 else "question"}, num_proc=16)
+    ds = ds.map(lambda x: {"prompt_category": random.choice(
+        ["explain", "describe", "analyze", "calculate", "synthesize", "summarize", "hypothesize"]
+            ) if x["prompt_type"] == "question" else random.choice(
+        ["reformat", "create", "combine", "give details about", "rewrite", "improve", "pretend"]
+    )}, num_proc=16)
+    
     chunk_size = 1_000
 
-    for i in range(0, df.shape[0], chunk_size):
-        chunk_df = df.iloc[i:i+chunk_size]
+    for i in range(183_000, len(ds), chunk_size):
+        chunk_ds = ds[i:i+chunk_size]
 
         input_data = list(zip(
-            chunk_df["title"],
-            [truncate_text(x) for x in tqdm(chunk_df["text"])],
-            chunk_df["language_name"],
-            chunk_df["prompt_type"]
+            chunk_ds["title"],
+            [truncate_text(x) for x in tqdm(chunk_ds["text"])],
+            chunk_ds["language_name"],
+            chunk_ds["prompt_type"],
+            chunk_ds["prompt_category"]
         ))
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             response_results = list(tqdm(executor.map(handle_openai_call, input_data), total=len(input_data)))
 
-        chunk_df["generated_prompt_response"] = response_results
+        chunk_ds["generated_prompt_response"] = response_results
 
-        chunk_df.to_parquet(f"./gen_data/generated_jiten_{str(i+217_000).zfill(7)}_{cluster_num}.parquet")
-        
+        pd.DataFrame(chunk_ds).to_parquet(f"./gen_data/redux_selected_generated_jiten_{str(i).zfill(7)}_{cluster_num}.parquet")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', '--num_samples_per_cluster', type=int, required=False, default=1)
